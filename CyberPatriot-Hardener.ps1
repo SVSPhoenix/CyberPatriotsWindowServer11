@@ -1,7 +1,49 @@
 # ==============================================================================
 # CYBERPATRIOT MASTER WINDOWS SERVER HARDENING SCRIPT
 # ==============================================================================
+# ==============================================================================
+# CYBERPATRIOT MASTER WINDOWS SERVER HARDENING SCRIPT
+# ==============================================================================
 
+# 0. ADMINISTRATOR PRIVILEGE CHECK
+$isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $isAdmin) {
+    Write-Host "==========================================================" -ForegroundColor Red
+    Write-Host "[ERROR] ACCESS DENIED: You are not running as Administrator!" -ForegroundColor Red
+    Write-Host "Please close this window, right-click the script, and select 'Run as administrator'." -ForegroundColor Yellow
+    Write-Host "==========================================================" -ForegroundColor Red
+    Pause
+    Exit
+}
+
+# 1. DEFINE HELPER FUNCTION (Must be placed before any Invoke-SafeStep calls)
+function Invoke-SafeStep {
+    param (
+        [string]$StepName,
+        [scriptblock]$Action
+    )
+    Write-Host "[+] $StepName..." -ForegroundColor Yellow
+    try {
+        $ErrorActionPreference = "Stop"
+        & $Action
+        Write-Host "    [OK] $StepName succeeded." -ForegroundColor Green
+    }
+    catch [System.UnauthorizedAccessException] {
+        Write-Host "    [ACCESS DENIED] Insufficient permissions for: $StepName" -ForegroundColor Red
+    }
+    catch {
+        Write-Host "    [WARNING] Could not complete $StepName - $($_.Exception.Message)" -ForegroundColor DarkYellow
+    }
+    finally {
+        $ErrorActionPreference = "Continue"
+    }
+}
+
+Write-Host "=========================================" -ForegroundColor Cyan
+Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
+Write-Host "=========================================" -ForegroundColor Cyan
+
+# --- YOUR HARDENING STEPS GO HERE ---
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
