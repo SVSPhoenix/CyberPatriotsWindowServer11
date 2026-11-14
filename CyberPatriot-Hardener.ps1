@@ -122,3 +122,91 @@ if ($foundTools) {
         $tool.FullName | Out-File -FilePath $logPath -Append -Encoding UTF8
     }
 }
+# ------------------------------------------------------------------------------
+# 8. ADVANCED AUDIT POLICIES
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Configuring Advanced Audit Policies" -Action {
+    auditpol /set /subcategory:"Computer Account Management" /success:enable /failure:enable | Out-Null
+    auditpol /set /subcategory:"Security Group Management" /success:enable /failure:enable | Out-Null
+    auditpol /set /subcategory:"Certification Services" /success:enable /failure:enable | Out-Null
+}
+
+# ------------------------------------------------------------------------------
+# 9. RDP & REMOTE DESKTOP HARDENING
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Securing RDP (NLA & TLS)" -Action {
+    # Require Network Level Authentication (NLA)
+    Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
+    
+    # Require specific security layer (TLS / SSL)
+    Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "SecurityLayer" -Value 2
+}
+
+# ------------------------------------------------------------------------------
+# 10. SMB PROTOCOL & NETWORK SECURITY HARDENING
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Hardening SMB & Authentication Rate Limiting" -Action {
+    # Ensure registry paths exist before setting values
+    $lanmanServerPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanServer"
+    $lanmanWorkstationPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanWorkstation"
+    
+    if (-not (Test-Path $lanmanServerPolicy)) { New-Item -Path $lanmanServerPolicy -Force | Out-Null }
+    if (-not (Test-Path $lanmanWorkstationPolicy)) { New-Item -Path $lanmanWorkstationPolicy -Force | Out-Null }
+
+    # SMB over QUIC
+    Set-ItemProperty -Path $lanmanServerPolicy -Name "EnableSMBQUIC" -Value 1
+    Set-ItemProperty -Path $lanmanWorkstationPolicy -Name "EnableSMBQUIC" -Value 1
+
+    # Block NTLM
+    Set-ItemProperty -Path $lanmanWorkstationPolicy -Name "BlockNTLM" -Value 1
+
+    # Minimum SMB Version 3.0.0+
+    Set-ItemProperty -Path $lanmanServerPolicy -Name "MinSmb2Dialect" -Value 300
+
+    # Authentication Rate Limiter & 2-second delay
+    Set-ItemProperty -Path $lanmanServerPolicy -Name "EnableAuthRateLimiter" -Value 1
+    Set-ItemProperty -Path $lanmanServerPolicy -Name "InvalidAuthenticationDelayTimeInMs" -Value 2000
+}
+
+# ------------------------------------------------------------------------------
+# 11. DEFENDER ASR RULES & VIRTUALIZATION-BASED SECURITY (VBS)
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Enabling Defender ASR Rules & VBS" -Action {
+    # Block Webshell creation for Servers ASR rule
+    Add-MpPreference -AttackSurfaceReductionRules_Ids "a8f5898e-1dc8-49a9-9878-85004b8a61e6" -AttackSurfaceReductionRules_Actions Enabled -ErrorAction SilentlyContinue
+
+    # VBS Mandatory Mode
+    $deviceGuardPath = "HKLM:\SYSTEM\CurrentControlSet\Control\DeviceGuard"
+    if (-not (Test-Path $deviceGuardPath)) { New-Item -Path $deviceGuardPath -Force | Out-Null }
+    Set-ItemProperty -Path $deviceGuardPath -Name "Mandatory" -Value 1
+
+    # Machine Identity Isolation
+    $policyDeviceGuard = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DeviceGuard"
+    if (-not (Test-Path $policyDeviceGuard)) { New-Item -Path $policyDeviceGuard -Force | Out-Null }
+    Set-ItemProperty -Path $policyDeviceGuard -Name "MachineIdentityIsolation" -Value 2
+}
+
+# ------------------------------------------------------------------------------
+# 12. DISABLE POWERSHELL 2.0
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Removing PowerShell 2.0 Optional Feature" -Action {
+    Disable-WindowsOptionalFeature -Online -FeatureName "MicrosoftWindowsPowerShellV2" -Remove -ErrorAction SilentlyContinue | Out-Null
+}
+
+# ------------------------------------------------------------------------------
+# 13. TARGETED CLEANUP OF KNOWN MALICIOUS ARTIFACTS
+# ------------------------------------------------------------------------------
+Invoke-SafeStep -StepName "Cleaning Known Malicious Startup & Password Files" -Action {
+    # Remove bad startup scripts if present
+    $badStartupScript = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\uwu.ps1"
+    if (Test-Path $badStartupScript) {
+        Remove-Item -Path $badStartupScript -Force -ErrorAction SilentlyContinue
+        Write-Host "    [REMOVED] Malicious startup script uwu.ps1" -ForegroundColor Green
+    }
+
+    # Search and remove plaintext password files in user folders
+    Get-ChildItem -Path "C:\Users" -Filter "passwords.txt" -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+        Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+        Write-Host "    [REMOVED] Plaintext password file: $($_.FullName)" -ForegroundColor Green
+    }
+}
