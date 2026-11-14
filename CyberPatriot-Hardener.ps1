@@ -215,3 +215,35 @@ Invoke-SafeStep -StepName "Cleaning Known Malicious Startup & Password Files" -A
         Write-Host "    [REMOVED] Plaintext password file: $($_.FullName)" -ForegroundColor Green
     }
 }
+
+#IIS WEB SERVER & DIRECTORY BROWSING CONFIGURATION
+Write-Host "[+] Configuring IIS Web Server & Disabling Directory Browsing..." -ForegroundColor Yellow
+if (Get-Service -Name "W3SVC" -ErrorAction SilentlyContinue) {
+    Set-Service -Name "W3SVC" -StartupType Automatic
+    Start-Service -Name "W3SVC" -ErrorAction SilentlyContinue
+}
+
+# Disable directory browsing globally for IIS
+Import-Module WebAdministration -ErrorAction SilentlyContinue
+Set-WebConfigurationProperty -Filter system.webserver/directorybrowse -PSPath iis:\ -Name Enabled -Value False
+Write-Host "    [OK] Directory browsing disabled for IIS." -ForegroundColor Green
+
+
+#SMB FILE SHARE (HANDBOOK) CONFIGURATION
+Write-Host "[+] Configuring Handbook SMB Share & Permissions..." -ForegroundColor Yellow
+if (Get-Service -Name "LanmanServer" -ErrorAction SilentlyContinue) {
+    Set-Service -Name "LanmanServer" -StartupType Automatic
+    Start-Service -Name "LanmanServer" -ErrorAction SilentlyContinue
+}
+
+$sharePath = "C:\Shares\Handbook"
+if (-not (Test-Path $sharePath)) {
+    New-Item -Path $sharePath -ItemType Directory -Force | Out-Null
+}
+
+# Recreate the share cleanly to ensure proper permissions
+Get-SmbShare -Name "Handbook" -ErrorAction SilentlyContinue | Remove-SmbShare -Force -ErrorAction SilentlyContinue
+
+# Create share: Everyone has Read access, Administrators have Full access
+New-SmbShare -Name "Handbook" -Path $sharePath -FullAccess "Administrators" -ReadAccess "Everyone" | Out-Null
+Write-Host "    [OK] Handbook SMB share configured successfully." -ForegroundColor Green
