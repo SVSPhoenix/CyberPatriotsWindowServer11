@@ -83,33 +83,42 @@ Remove-Item $secPolFile -ErrorAction SilentlyContinue
 Write-Host "    Password complexity enabled and reversible encryption disabled."
 
 # ------------------------------------------------------------------------------
-# 7. SCAN FOR PROHIBITED MEDIA & UNAUTHORIZED FILES
+# 7. SCAN FOR PROHIBITED MEDIA & UNAUTHORIZED FILES (FULL PATHS)
 # ------------------------------------------------------------------------------
-Write-Host "[+] Scanning system for unauthorized media and prohibited files..." -ForegroundColor Yellow
+Write-Host "[+] Scanning user profiles for unauthorized media..." -ForegroundColor Yellow
 $mediaExtensions = @("*.mp3", "*.mp4", "*.avi", "*.mkv", "*.mov", "*.wav", "*.flac", "*.wma", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.torrent")
 $hackingTools = @("*wireshark*", "*cain*", "*john*", "*nmap*", "*ophcrack*", "*keylogger*", "*mimikatz*")
 
 $logPath = "$env:USERPROFILE\Desktop\Prohibited_Files_Found.txt"
-"--- CYBERPATRIOT PROHIBITED FILES AUDIT LOG ---`n" | Out-File -FilePath $logPath
+"--- CYBERPATRIOT PROHIBITED FILES AUDIT LOG ---`n" | Out-File -FilePath $logPath -Encoding UTF8
 
-$foundFiles = Get-ChildItem -Path "C:\" -Recurse -Include $mediaExtensions -ErrorAction SilentlyContinue | 
-    Where-Object { $_.FullName -notmatch "C:\\Users\\.*\\Desktop" -and $_.FullName -notmatch "C:\\Windows\\System32" }
+# Restrict search to C:\Users (excluding AppData and Desktop)
+$foundFiles = Get-ChildItem -Path "C:\Users" -Recurse -Include $mediaExtensions -ErrorAction SilentlyContinue | 
+    Where-Object { 
+        $_.FullName -notmatch "\\AppData\\" -and 
+        $_.FullName -notmatch "\\Desktop\\" 
+    }
 
 $foundTools = Get-ChildItem -Path "C:\Users", "C:\Program Files", "C:\Program Files (x86)" -Recurse -Include $hackingTools -ErrorAction SilentlyContinue
 
 if ($foundFiles) {
-    Write-Host "    Found $(($foundFiles).Count) prohibited media files!" -ForegroundColor Red
-    $foundFiles | Select-Object FullName, Length | Out-File -FilePath $logPath -Append
+    Write-Host "    [FOUND] $(($foundFiles).Count) prohibited media files:" -ForegroundColor Red
+    "=== PROHIBITED MEDIA FILES ===" | Out-File -FilePath $logPath -Append -Encoding UTF8
+    foreach ($file in $foundFiles) {
+        $sizeKB = [math]::Round($file.Length / 1KB, 1)
+        $entry = "$($file.FullName)  [$sizeKB KB]"
+        Write-Host "      -> $entry" -ForegroundColor Gray
+        $entry | Out-File -FilePath $logPath -Append -Encoding UTF8
+    }
 } else {
-    Write-Host "    No prohibited media files found outside Desktop." -ForegroundColor Green
+    Write-Host "    [OK] No prohibited user media found." -ForegroundColor Green
 }
 
 if ($foundTools) {
-    Write-Host "    Found suspicious security tools!" -ForegroundColor Red
-    $foundTools | Select-Object FullName | Out-File -FilePath $logPath -Append
+    Write-Host "    [FOUND] $(($foundTools).Count) suspicious security tools:" -ForegroundColor Red
+    "`n=== SUSPICIOUS TOOLS ===" | Out-File -FilePath $logPath -Append -Encoding UTF8
+    foreach ($tool in $foundTools) {
+        Write-Host "      -> $($tool.FullName)" -ForegroundColor Gray
+        $tool.FullName | Out-File -FilePath $logPath -Append -Encoding UTF8
+    }
 }
-
-Write-Host "=========================================" -ForegroundColor Green
-Write-Host "All Hardening Tasks Completed Successfully!" -ForegroundColor Green
-Write-Host "Check Desktop for Prohibited_Files_Found.txt" -ForegroundColor Green
-Write-Host "=========================================" -ForegroundColor Green
