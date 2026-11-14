@@ -1,11 +1,4 @@
-# ==============================================================================
-# CYBERPATRIOT MASTER WINDOWS SERVER HARDENING SCRIPT
-# ==============================================================================
-# ==============================================================================
-# CYBERPATRIOT MASTER WINDOWS SERVER HARDENING SCRIPT
-# ==============================================================================
-
-# 0. ADMINISTRATOR PRIVILEGE CHECK
+# 0.
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host "==========================================================" -ForegroundColor Red
@@ -16,7 +9,7 @@ if (-not $isAdmin) {
     Exit
 }
 
-# 1. DEFINE HELPER FUNCTION (Must be placed before any Invoke-SafeStep calls)
+# 1.
 function Invoke-SafeStep {
     param (
         [string]$StepName,
@@ -43,27 +36,20 @@ Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
-# --- YOUR HARDENING STEPS GO HERE ---
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
 Write-Host "=========================================" -ForegroundColor Cyan
 
-# ------------------------------------------------------------------------------
-# 1. ACCOUNT POLICIES (Password & Lockout Settings)
-# ------------------------------------------------------------------------------
+# 1. ACCOUNT POLICIES
 Write-Host "[+] Configuring Account Policies..." -ForegroundColor Yellow
 net accounts /minpwlen:10 /maxpwage:90 /minpwage:1 /uniquepw:5
 net accounts /lockoutthreshold:5 /lockoutduration:30 /lockoutwindow:30
 
-# ------------------------------------------------------------------------------
-# 2. FIREWALL CONFIGURATION
-# ------------------------------------------------------------------------------
+# 2. FIREWALL
 Write-Host "[+] Enabling Windows Firewall..." -ForegroundColor Yellow
 Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled True
 
-# ------------------------------------------------------------------------------
-# 3. DISABLE INSECURE / UNWANTED SERVICES
-# ------------------------------------------------------------------------------
+# 3. DISABLE INSECURE SERVICES
 Write-Host "[+] Disabling Insecure Services..." -ForegroundColor Yellow
 $servicesToDisable = @("Telnet", "RemoteRegistry", "SNMP", "XboxGipSvc", "XblAuthManager")
 foreach ($svc in $servicesToDisable) {
@@ -74,9 +60,7 @@ foreach ($svc in $servicesToDisable) {
     }
 }
 
-# ------------------------------------------------------------------------------
 # 4. SECURITY OPTIONS & REGISTRY TWEAKS
-# ------------------------------------------------------------------------------
 Write-Host "[+] Applying Registry & Security Options..." -ForegroundColor Yellow
 
 # Disable Guest account
@@ -92,9 +76,7 @@ Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "EnableLUA" -Value 1
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System" -Name "ConsentPromptBehaviorAdmin" -Value 2
 
-# ------------------------------------------------------------------------------
 # 5. FIX SERVER MANAGER & REMOTE MANAGEMENT ISSUES
-# ------------------------------------------------------------------------------
 Write-Host "[+] Repairing Server Manager and WinRM Services..." -ForegroundColor Yellow
 if (Get-Service -Name "WinRM" -ErrorAction SilentlyContinue) {
     Set-Service -Name "WinRM" -StartupType Automatic
@@ -108,9 +90,7 @@ winmgmt /salvagerepository 2>$null
 
 Get-ScheduledTask -TaskName "*ServerManager*" -ErrorAction SilentlyContinue | Enable-ScheduledTask -ErrorAction SilentlyContinue
 
-# ------------------------------------------------------------------------------
 # 6. ENFORCE PASSWORD COMPLEXITY & DISABLE REVERSIBLE ENCRYPTION
-# ------------------------------------------------------------------------------
 Write-Host "[+] Configuring Password Complexity and Security Policy..." -ForegroundColor Yellow
 $secPolFile = "$env:TEMP\secpol.cfg"
 secedit /export /cfg $secPolFile
@@ -124,9 +104,7 @@ secedit /configure /db "$env:windir\security\local.sdb" /cfg $secPolFile /areas 
 Remove-Item $secPolFile -ErrorAction SilentlyContinue
 Write-Host "    Password complexity enabled and reversible encryption disabled."
 
-# ------------------------------------------------------------------------------
-# 7. SCAN FOR PROHIBITED MEDIA & UNAUTHORIZED FILES (FULL PATHS)
-# ------------------------------------------------------------------------------
+# 7. SCAN FOR PROHIBITED MEDIA & UNAUTHORIZED FILES
 Write-Host "[+] Scanning user profiles for unauthorized media..." -ForegroundColor Yellow
 $mediaExtensions = @("*.mp3", "*.mp4", "*.avi", "*.mkv", "*.mov", "*.wav", "*.flac", "*.wma", "*.png", "*.jpg", "*.jpeg", "*.gif", "*.bmp", "*.torrent")
 $hackingTools = @("*wireshark*", "*cain*", "*john*", "*nmap*", "*ophcrack*", "*keylogger*", "*mimikatz*")
@@ -134,7 +112,6 @@ $hackingTools = @("*wireshark*", "*cain*", "*john*", "*nmap*", "*ophcrack*", "*k
 $logPath = "$env:USERPROFILE\Desktop\Prohibited_Files_Found.txt"
 "--- CYBERPATRIOT PROHIBITED FILES AUDIT LOG ---`n" | Out-File -FilePath $logPath -Encoding UTF8
 
-# Restrict search to C:\Users (excluding AppData and Desktop)
 $foundFiles = Get-ChildItem -Path "C:\Users" -Recurse -Include $mediaExtensions -ErrorAction SilentlyContinue | 
     Where-Object { 
         $_.FullName -notmatch "\\AppData\\" -and 
@@ -164,18 +141,14 @@ if ($foundTools) {
         $tool.FullName | Out-File -FilePath $logPath -Append -Encoding UTF8
     }
 }
-# ------------------------------------------------------------------------------
-# 8. ADVANCED AUDIT POLICIES
-# ------------------------------------------------------------------------------
+# 8.AUDIT POLICIES
 Invoke-SafeStep -StepName "Configuring Advanced Audit Policies" -Action {
     auditpol /set /subcategory:"Computer Account Management" /success:enable /failure:enable | Out-Null
     auditpol /set /subcategory:"Security Group Management" /success:enable /failure:enable | Out-Null
     auditpol /set /subcategory:"Certification Services" /success:enable /failure:enable | Out-Null
 }
 
-# ------------------------------------------------------------------------------
 # 9. RDP & REMOTE DESKTOP HARDENING
-# ------------------------------------------------------------------------------
 Invoke-SafeStep -StepName "Securing RDP (NLA & TLS)" -Action {
     # Require Network Level Authentication (NLA)
     Set-ItemProperty -Path "HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp" -Name "UserAuthentication" -Value 1
@@ -184,9 +157,7 @@ Invoke-SafeStep -StepName "Securing RDP (NLA & TLS)" -Action {
     Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services" -Name "SecurityLayer" -Value 2
 }
 
-# ------------------------------------------------------------------------------
 # 10. SMB PROTOCOL & NETWORK SECURITY HARDENING
-# ------------------------------------------------------------------------------
 Invoke-SafeStep -StepName "Hardening SMB & Authentication Rate Limiting" -Action {
     # Ensure registry paths exist before setting values
     $lanmanServerPolicy = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\LanmanServer"
@@ -210,9 +181,7 @@ Invoke-SafeStep -StepName "Hardening SMB & Authentication Rate Limiting" -Action
     Set-ItemProperty -Path $lanmanServerPolicy -Name "InvalidAuthenticationDelayTimeInMs" -Value 2000
 }
 
-# ------------------------------------------------------------------------------
-# 11. DEFENDER ASR RULES & VIRTUALIZATION-BASED SECURITY (VBS)
-# ------------------------------------------------------------------------------
+# 11. DEFENDER ASR RULES
 Invoke-SafeStep -StepName "Enabling Defender ASR Rules & VBS" -Action {
     # Block Webshell creation for Servers ASR rule
     Add-MpPreference -AttackSurfaceReductionRules_Ids "a8f5898e-1dc8-49a9-9878-85004b8a61e6" -AttackSurfaceReductionRules_Actions Enabled -ErrorAction SilentlyContinue
@@ -228,16 +197,10 @@ Invoke-SafeStep -StepName "Enabling Defender ASR Rules & VBS" -Action {
     Set-ItemProperty -Path $policyDeviceGuard -Name "MachineIdentityIsolation" -Value 2
 }
 
-# ------------------------------------------------------------------------------
-# 12. DISABLE POWERSHELL 2.0
-# ------------------------------------------------------------------------------
 Invoke-SafeStep -StepName "Removing PowerShell 2.0 Optional Feature" -Action {
     Disable-WindowsOptionalFeature -Online -FeatureName "MicrosoftWindowsPowerShellV2" -Remove -ErrorAction SilentlyContinue | Out-Null
 }
 
-# ------------------------------------------------------------------------------
-# 13. TARGETED CLEANUP OF KNOWN MALICIOUS ARTIFACTS
-# ------------------------------------------------------------------------------
 Invoke-SafeStep -StepName "Cleaning Known Malicious Startup & Password Files" -Action {
     # Remove bad startup scripts if present
     $badStartupScript = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\uwu.ps1"
