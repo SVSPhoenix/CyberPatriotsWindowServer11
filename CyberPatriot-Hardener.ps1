@@ -1,9 +1,7 @@
-# 0.
 $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if (-not $isAdmin) {
     Write-Host "==========================================================" -ForegroundColor Red
-    Write-Host "[ERROR] ACCESS DENIED: You are not running as Administrator!" -ForegroundColor Red
-    Write-Host "Please close this window, right-click the script, and select 'Run as administrator'." -ForegroundColor Yellow
+    Write-Host "[ERROR] ACCESS DENIED: ur not running as Administrator!" -ForegroundColor Red
     Write-Host "==========================================================" -ForegroundColor Red
     Pause
     Exit
@@ -31,10 +29,6 @@ function Invoke-SafeStep {
         $ErrorActionPreference = "Continue"
     }
 }
-
-Write-Host "=========================================" -ForegroundColor Cyan
-Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
-Write-Host "=========================================" -ForegroundColor Cyan
 
 Write-Host "=========================================" -ForegroundColor Cyan
 Write-Host "Starting Master CyberPatriot Hardening..." -ForegroundColor Cyan
