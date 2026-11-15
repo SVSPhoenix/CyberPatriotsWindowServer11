@@ -36,7 +36,7 @@ Write-Host "=========================================" -ForegroundColor Cyan
 
 # 1. ACCOUNT POLICIES
 Write-Host "[+] Configuring Account Policies..." -ForegroundColor Yellow
-net accounts /minpwlen:10 /maxpwage:90 /minpwage:1 /uniquepw:5
+net accounts /minpwlen:15 /maxpwage:90 /minpwage:1 /uniquepw:5
 net accounts /lockoutthreshold:5 /lockoutduration:30 /lockoutwindow:30
 
 # 2. FIREWALL
